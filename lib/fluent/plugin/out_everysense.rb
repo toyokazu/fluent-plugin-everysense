@@ -27,6 +27,7 @@ module Fluent
     # Open sockets or files here.
     def start
       super
+      start_proxy
     end
 
     def add_send_time(record)
