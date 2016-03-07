@@ -35,7 +35,7 @@ irb(main):015:0> session_res.body
 => "{\"code\":0,\"session_key\":\"YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYYY\"}"
 ```
 
-ここで取得した session_key は、デバイスのデータ（/device_data）およびレシピのデータ（/recipe_data）を読み出す際に必要となります。
+ここで取得したsession_keyは、デバイスのデータ（/device_data）およびレシピのデータ（/recipe_data）を読み出す際に必要となります。
 
 ```ruby
 session_key = JSON.parse(session_res.body)["session_key"]
@@ -98,3 +98,22 @@ ZZZZZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZZZZZZZZZ
 recipe_data = https.get(uri + "/recipe_data/ZZZZZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZZZZZZZZZ.xml?session_key=#{session_key}&from=2016-03-06-07:00&to=2016-03-06-07:50")
 recipe_data.body
 ```
+
+# session_keyについて
+
+device_dataにはlogin_name、passwordでもアクセスできますが、毎回提示すると login_name、passwordが奪われる可能性が高くなるため、代わりにsession_keyを用いてアクセスします。ただし、session_keyが他人に奪われると不正にアクセスされる可能性があるため、利用が終わったらsession_keyを無効化するようにしましょう。以下の手順でsession_keyを無効化できます。
+
+```ruby
+del_session_req = Net::HTTP::Delete.new(uri + "/session/#{session_key}")
+del_session_res = https.request(del_session_req)
+del_session_res.body
+```
+
+以下のように 'code: 0' が返されていれば削除成功です。
+
+```
+irb(main):037:0> del_session_res.body
+=> "{\"code\":0}"
+```
+
+現状はsession_keyにはかなり長い時間の有効期間が与えられているようで、1日たってもアクセスできました (^^;;
