@@ -1,5 +1,5 @@
 module Fluent
-  class EverySenseOutput < Output
+  class EverySenseOutput < BufferedOutput
     require 'fluent/plugin/everysense_proxy'
     include EverySenseProxy
 
@@ -39,20 +39,23 @@ module Fluent
       end
     end
 
-    def emit(tag, es, chain)
-      chain.next
-      es.each {|time,record|
-        $log.debug "#{tag}, #{@formatter.format_record(add_send_time(record)).chomp}\n"
-        put_message(@formatter.format_record(add_send_time(record)))
-      }
+    def format(tag, time, record)
+      [tag, time, record].to_msgpack
+    end
+
+    def write(chunk)
+      chunk.msgpack_each do |tag, time, record|
+        $log.debug "#{tag}, #{@formatter.format(tag, time, add_send_time(record)).chomp}\n"
+        put_message(@formatter.format(tag, time, add_send_time(record)))
+      end
       $log.flush
     end
 
     # This method is called when shutting down.
     # Shutdown the thread and close sockets or files here.
     def shutdown
-      super
       shutdown_proxy
+      super
     end
   end
 end

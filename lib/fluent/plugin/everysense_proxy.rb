@@ -5,6 +5,9 @@ module Fluent
     require 'json'
     require 'time'
 
+    class EverySenseProxyError
+    end
+
     def self.included(base)
       base.desc 'EverySense API URI'
       base.config_param :url, :string, :default => 'https://api.every-sense.com:8001/'
@@ -12,11 +15,14 @@ module Fluent
       base.config_param :login_name, :string, :default => nil  # TODO: mandatory option
       base.desc 'password for EverySense API'
       base.config_param :password, :string, :default => nil  # TODO: mandatory option
-      base.config_param :device_id, :string, :default => nil  # TODO: mandatory option
+      base.config_param :device_id, :string, :default => nil
       base.config_param :recipe_id, :string, :default => nil
       base.config_param :format, :string, :default => 'json'
+      base.config_param :limit, :integer, :default => 1000
       #base.config_param :keep_alive, :integer, :default => 2
       base.config_param :from, :string, :default => Time.now.iso8601
+      base.config_param :keep, :bool, :default => false
+      base.config_param :inline, :bool, :default => false
     end
 
     def start_proxy
@@ -29,7 +35,9 @@ module Fluent
     end
 
     def shutdown_proxy
+      $log.debug "shutdown_proxy #{@session_key}"
       delete_session
+      @https.finish() if @https.active?
     end
 
     def error_handler(response, message)
@@ -45,22 +53,6 @@ module Fluent
 
     def valid_session?
       !@session_key.nil? # TODO validate @session_key using EverySense API
-    end
-
-    def validate_device
-      if @device_id.nil?
-        $log.error :error => 'Invalid device id.'
-        return false
-      end
-      return true
-    end
-
-    def validate_recipe
-      if @recipe_id.nil?
-        $log.error :error => 'Invalid recipe id.'
-        return false
-      end
-      return true
     end
 
     def create_session_request
@@ -96,41 +88,53 @@ module Fluent
     end
 
     def put_message(message)
-      return if !validate_device
       put_message_res = @https.request(put_message_request(message))
       error_handler(put_message_res, "put_message: '#{message}' failed.")
     end
 
-    def get_message_request
-      get_message_req = @uri + "/device_data/#{@device_id}?session_key=#{@session_key}&from=#{URI.encode_www_form_component(@from)}&to=#{URI.encode_www_form_component(Time.now.iso8601)}"
+    def target_path
+      if !@device_id.nil?
+        return "/device_data/#{@device_id}"
+      elsif !@recipe_id.nil?
+        return "/recipe_data/#{@recipe_id}.#{@format}"
+      else
+        raise ConfigError, "device_id or recipe_id must be specified."
+      end
+    end
+
+    def get_messages_params
+      params = {
+        session_key: @session_key,
+        from: @from,
+        to: Time.now.iso8601,
+        limit: @limit
+      }
+      if !@device_id.nil?
+        return params
+      elsif !@recipe_id.nil?
+        return params.merge({keep: @keep, inline: @inline, format: @format})
+      else
+        raise ConfigError, "device_id or recipe_id must be specified."
+      end
+    end
+
+    def get_messages_request
+      get_messages_req = @uri + target_path
+      get_messages_req.query = URI.encode_www_form(get_messages_params)
+      $log.debug "#{@uri + target_path}?#{URI.encode_www_form(get_messages_params)}"
+      # currently time window is automatically updated
       @from = (Time.now + 1).iso8601
-      get_message_req
+      get_messages_req
     end
 
-    def get_message
+    def get_messages
       if !valid_session?
         return nil if create_session.nil?
         $log.debug "session #{@session_key} created."
       end
-      return nil if !validate_device
-      get_message_res = @https.get(get_message_request)
-      return nil if !error_handler(get_message_res,"get_message failed.")
-      get_message_res.body
-    end
-
-    def get_recipe_request
-      @uri + "/recipe_data/#{@recipe_id}"
-    end
-
-    def get_recipe
-      if !valid_session?
-        return nil if create_session.nil?
-        $log.debug "session #{@session_key} created."
-      end
-      return nil if !validate_recipe
-      get_recipe_res = @https.get(get_recipe_request)
-      return nil if !error_handler(get_recipe_res, "get_recipe failed.")
-      get_recipe_res.body
+      get_messages_res = @https.get(get_messages_request)
+      return nil if !error_handler(get_messages_res,"get_messages failed.")
+      get_messages_res.body
     end
   end
 end

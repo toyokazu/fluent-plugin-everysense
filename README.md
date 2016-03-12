@@ -36,11 +36,12 @@ Input Plugin can be used via source directive in the configuration.
 </source>
 ```
 
-- **format** (required): type of parser can be specified to parse input data
+- **format** (required): type of parser can be specified to parse input data. currently only json format is supported. parser plugin options can also be specified.
 - **tag** (required): tag name appended to the input data inside fluentd network
 - **login_name** (required): login_name to login https://service.every-sense.com/
 - **password** (required): password for the login_name
-- **device_id** (required): the target device id to obtain input data
+- **device_id** (device_id or recipe_id is required): the target device id to obtain input data
+- **recipe_id** (device_id or recipe_id is required): the target recipe id to obtain input data
 - **polling_interval**: interval to poll EverySense JSON over HTTP API
 
 
@@ -81,4 +82,3 @@ Recipe related function is not implemented yet.
 ## License
 
 The gem is available as open source under the terms of the [MIT License](http://opensource.org/licenses/MIT).
-

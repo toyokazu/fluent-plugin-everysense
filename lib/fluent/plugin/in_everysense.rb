@@ -5,11 +5,43 @@ module Fluent
 
     Plugin.register_input('everysense', self)
 
+    # currently EverySenseParser is only used by EverySense Plugin
+    # Parser is implemented internally.
+    class EverySenseParser
+      def initialize(format, parser)
+        case format
+        when 'json'
+          @parser = parser
+          return
+        when 'xml'
+          raise NotImplementedError, "XML parser is not implemented yet."
+        else
+          raise NotImplementedError, "XML parser is not implemented yet."
+        end
+      end
+
+      # TODO: parser should be impelented prettier way...
+      # currently once parse JSON array is parsed and in map loop
+      # each message is re-formatted to JSON. After that it is re-parsed
+      # by fluent JSON parser which supports time_format etc. options...
+      def parse(messages)
+        $log.debug messages
+        JSON.parse(messages).map do |message|
+          $log.debug message
+          @parser.parse(message.to_json) do |time, record|
+            yield(time, record)
+          end
+        end
+      end
+    end
+
     desc 'Tag name assigned to inputs'
     config_param :tag, :string, :default => nil # TODO: mandatory option
     desc 'Polling interval to get message from EverySense API'
-    config_param :polling_interval, :integer, :default => 15
+    config_param :polling_interval, :integer, :default => 60
+    desc 'Adding timestamp to the message for monitoring performance'
     config_param :recv_time, :bool, :default => false
+    desc 'Attribute name of the timestamp for receiving time'
     config_param :recv_time_key, :string, :default => "recv_time"
 
     # Define `router` method of v0.12 to support v0.10 or earlier
@@ -25,6 +57,7 @@ module Fluent
     def configure_parser(conf)
       @parser = Plugin.new_parser(@format)
       @parser.configure(conf)
+      @everysense_parser = EverySenseParser.new(@format, @parser)
     end
 
     def start
@@ -34,9 +67,9 @@ module Fluent
       @proxy_thread = Thread.new do
         while (true)
           begin
-            message = get_message
-            $log.debug "get_message: #{message}"
-            emit(message) if !message.nil?
+            messages = get_messages
+            $log.debug "get_messages: #{messages}"
+            emit(messages) if !(messages.nil? || messages.empty?)
             sleep @polling_interval
           rescue Exception => e
             $log.error :error => e.to_s
@@ -57,20 +90,22 @@ module Fluent
       end
     end
 
-    def parse(message)
-      @parser.parse(message) do |time, record|
+    def parse(messages)
+      @everysense_parser.parse(messages) do |time, record|
         if time.nil?
           $log.debug "Since time_key field is nil, Fluent::Engine.now is used."
           time = Fluent::Engine.now
         end
         $log.debug "#{time}, #{add_recv_time(record)}"
-        return [time, add_recv_time(record)]
+        {time: time, record: add_recv_time(record)}
       end
     end
 
-    def emit(message)
+    def emit(messages)
       begin
-        router.emit(@tag, *parse(message))
+        parse(messages).each do |msg|
+          router.emit(@tag, msg[:time], msg[:record])
+        end
       rescue Exception => e
         $log.error :error => e.to_s
         $log.debug_backtrace(e.backtrace)
@@ -78,9 +113,9 @@ module Fluent
     end
 
     def shutdown
-      super
       @proxy_thread.kill
       shutdown_proxy
+      super
     end
   end
 end
