@@ -1,6 +1,6 @@
 # Ruby を使って EverySense の API で遊んでみよう！
 
-Ruby のインタラクティブシェル irb あるいは pry などを利用して EverySense の API で遊んでみましょう。遊ぶ前にまず EverySense 基礎用語を抑えておきましょう。
+Ruby のインタラクティブシェル irb あるいは pry などを利用して EverySense の API で遊んでみましょう。遊ぶ前にまず EverySense 基礎用語をおさえておきましょう。
 
 ## EverySense 基礎用語
 
