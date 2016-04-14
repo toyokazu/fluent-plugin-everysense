@@ -4,7 +4,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 Gem::Specification.new do |spec|
   spec.name          = "fluent-plugin-everysense"
-  spec.version       = "0.0.2"
+  spec.version       = "0.0.3"
   spec.authors       = ["Toyokazu Akiyama"]
   spec.email         = ["toyokazu@gmail.com"]
 
@@ -13,7 +13,7 @@ Gem::Specification.new do |spec|
   spec.homepage      = "https://github.com/toyokazu/fluent-plugin-everysense"
   spec.license       = "MIT"
 
-  spec.files         = `git ls-files`.gsub(/images\/[\w\.]+\n/, "").split($/)
+  spec.files         = `git ls-files`.gsub(/.+images\/[\w\.-]+\n/, "").split($/)
   spec.executables   = spec.files.grep(%r{^bin/}) { |f| File.basename(f) }
   spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
   spec.require_paths = ["lib"]
