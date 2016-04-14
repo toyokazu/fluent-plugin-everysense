@@ -13,7 +13,7 @@ https://service.every-sense.com で遊ぶためには最低限以下の用語を
 - **デバイスのクラス**: スマートフォンのようにデバイスには複数のセンサが搭載されていると想定されています。デバイスにどのような精度のセンサが搭載されているのか、例えば製品ごとに事前にクラスとして登録しておくことができます。**ファームオーナー** は保持しているデバイスに対応するクラスを選択して、EverySenseに登録することになります。
 - **デバイスとセンサ**: **デバイスのクラス** を定義する際には、デバイスに接続された **センサ** を登録する必要があります。１つのデバイスに対して複数の **センサ** が取り付けられることが想定されています。**センサ** は無線接続されたものも含むため、センサごとに設置箇所を登録できます。登録時に指定した **センサ** の名称はデータアップロード時に利用するのでメモしておきましょう。
 
-![EverySense基礎用語の概説図](https://github.com/toyokazu/fluent-plugin-everysense/tree/master/tutorial/ja/images/every-sense-overview.png "EverySense基礎用語の概説図]")
+![EverySense基礎用語の概説図](https://raw.githubusercontent.com/toyokazu/fluent-plugin-everysense/master/tutorial/ja/images/every-sense-overview.png "EverySense基礎用語の概説図]")
 
 ## アカウントの登録
 
