@@ -80,6 +80,27 @@ module Fluent
       error_handler(del_session_res, 'delete_session failed.')
     end
 
+    # put_message_request
+    # message format for EverySense is as follows
+    #
+    # [
+    #   {
+    #     "data": {
+    #       "at":"2016-04-14 17:15:00 +0900",
+    #       "unit":"degree Celsius",
+    #       "value":23
+    #     },
+    #     "sensor_name":"FESTIVAL_Test1_Sensor"
+    #   },
+    #   {
+    #     "data": {
+    #       "at":"2016-04-14 17:15:00 +0900",
+    #       "unit":"%RH",
+    #       "value":30
+    #     },
+    #     "sensor_name":"FESTIVAL_Test1_Sensor2"
+    #   }
+    # ]
     def put_message_request(message)
       put_message_req = Net::HTTP::Post.new(@uri + "/device_data/#{@device_id}")
       put_message_req.body = message

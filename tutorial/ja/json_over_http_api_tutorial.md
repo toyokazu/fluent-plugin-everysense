@@ -13,7 +13,7 @@ https://service.every-sense.com で遊ぶためには最低限以下の用語を
 - **デバイスのクラス**: スマートフォンのようにデバイスには複数のセンサが搭載されていると想定されています。デバイスにどのような精度のセンサが搭載されているのか、例えば製品ごとに事前にクラスとして登録しておくことができます。**ファームオーナー** は保持しているデバイスに対応するクラスを選択して、EverySenseに登録することになります。
 - **デバイスとセンサ**: **デバイスのクラス** を定義する際には、デバイスに接続された **センサ** を登録する必要があります。１つのデバイスに対して複数の **センサ** が取り付けられることが想定されています。**センサ** は無線接続されたものも含むため、センサごとに設置箇所を登録できます。登録時に指定した **センサ** の名称はデータアップロード時に利用するのでメモしておきましょう。
 
-![EverySense基礎用語の概説図](https://raw.githubusercontent.com/toyokazu/fluent-plugin-everysense/master/tutorial/ja/images/every-sense-overview.png "EverySense基礎用語の概説図]")
+![EverySense基礎用語の概説図](https://raw.githubusercontent.com/toyokazu/fluent-plugin-everysense/master/tutorial/ja/images/every-sense-overview.png "EverySense基礎用語の概説図")
 
 ## アカウントの登録
 
@@ -167,6 +167,8 @@ irb(main):023:0> upload_res.body
 upload_req.body = [{"data" => {"at" => Time.now.to_s, "unit" => "degree Celsius", "value" => 23}, "sensor_name" => "FESTIVAL_Test1_Sensor"}, {"data" => {"at" => Time.now.to_s, "unit" => "%RH", "value" => 30}, "sensor_name" => "FESTIVAL_Test1_Sensor2"}].to_json
 ```
 
+なお、EverySenseでは、デバイスから受け取ったデータをレシピで指定された間隔で最初に受け取ったデータを送出するため、その後受け取ったデータを重複して送出しないように、しばらく後から来るデータを待つ仕様になっています。すぐにデータの送出を確認したい場合は、指定間隔内で複数のデータをアップロードしてみてください。
+
 
 #### デバイスのデータのダウンロード
 
@@ -225,6 +227,8 @@ recipe_data_res.body
 ```
 
 取得したデータ中の `"FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF"` はファームのUUIDを示しています。
+
+なお、レシピに対してデバイスからデータが届いているかどうかは、レストランオーナーであれば、「登録中のレシピ」でレシピ一覧を表示し、該当レシピ部分を確認するとダウンロードできるデータの件数が表示されます。また、ファームオーナーであれば、「稼働中のオーダー」から該当レシピのオーダー詳細を参照すると、下部のファーム稼働状況のグラフでデータが送信されているかどうかが確認できます。
 
 
 ### session_keyの無効化について
