@@ -12,12 +12,9 @@ module Fluent
       base.desc 'EverySense API URI'
       base.config_param :url, :string, :default => 'https://api.every-sense.com:8001/'
       base.desc 'login_name for EverySense API'
-      base.config_param :login_name, :string, :default => nil  # TODO: mandatory option
+      base.config_param :login_name, :string
       base.desc 'password for EverySense API'
-      base.config_param :password, :string, :default => nil  # TODO: mandatory option
-      base.config_param :device_id, :string, :default => nil
-      base.config_param :recipe_id, :string, :default => nil
-      base.config_param :format, :string, :default => 'json'
+      base.config_param :password, :string
       base.config_param :limit, :integer, :default => 1000
       #base.config_param :keep_alive, :integer, :default => 2
       base.config_param :from, :string, :default => Time.now.iso8601
@@ -26,7 +23,7 @@ module Fluent
     end
 
     def start_proxy
-      $log.debug "start everysense proxy #{@uri}"
+      $log.debug "start everysense proxy #{@url}"
 
       @uri = URI.parse(@url)
       @https = Net::HTTP.new(@uri.host, @uri.port)
@@ -80,27 +77,6 @@ module Fluent
       error_handler(del_session_res, 'delete_session failed.')
     end
 
-    # put_message_request
-    # message format for EverySense is as follows
-    #
-    # [
-    #   {
-    #     "data": {
-    #       "at":"2016-04-14 17:15:00 +0900",
-    #       "unit":"degree Celsius",
-    #       "value":23
-    #     },
-    #     "sensor_name":"FESTIVAL_Test1_Sensor"
-    #   },
-    #   {
-    #     "data": {
-    #       "at":"2016-04-14 17:15:00 +0900",
-    #       "unit":"%RH",
-    #       "value":30
-    #     },
-    #     "sensor_name":"FESTIVAL_Test1_Sensor2"
-    #   }
-    # ]
     def put_message_request(message)
       put_message_req = Net::HTTP::Post.new(@uri + "/device_data/#{@device_id}")
       put_message_req.body = message
@@ -109,6 +85,7 @@ module Fluent
     end
 
     def put_message(message)
+      $log.debug "put_message: #{message}"
       put_message_res = @https.request(put_message_request(message))
       error_handler(put_message_res, "put_message: '#{message}' failed.")
     end
@@ -144,7 +121,7 @@ module Fluent
       get_messages_req.query = URI.encode_www_form(get_messages_params)
       $log.debug "#{@uri + target_path}?#{URI.encode_www_form(get_messages_params)}"
       # currently time window is automatically updated
-      @from = (Time.now + 1).iso8601
+      @from = Time.now.iso8601
       get_messages_req
     end
 
@@ -155,6 +132,7 @@ module Fluent
       end
       get_messages_res = @https.get(get_messages_request)
       return nil if !error_handler(get_messages_res,"get_messages failed.")
+      $log.debug "get_message: #{get_messages_res.body}"
       get_messages_res.body
     end
   end
