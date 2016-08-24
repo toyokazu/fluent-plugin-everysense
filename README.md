@@ -22,7 +22,7 @@ fluent-plugin-everysense has Input and Output Plugins for EverySense platform.
 
 ### Input Plugin (Fluent::EverySenseInput)
 
-Input Plugin can be used via source directive in the configuration.
+Input Plugin can receive events from EverySense Server. It can be used via source directive in the configuration.
 
 ```
 <source>
@@ -49,19 +49,20 @@ Since each device may have multiple sensors, time field is generated when Input 
 ```
 {"json":
   [
-    {"data": {
+    { "data": {
         "at": "2016-05-15 12:14:30 +0900",
         "unit":"degree Celsius",
         "value":23
       },
-     "sensor_name":"collection_data_1"
+      "sensor_name":"collection_data_1"
     },
-    {"data": {
+    { "data": {
         "at":"2016-05-15 12:14:30 +0900",
         "unit":"%RH",
         "value":30
       },
-     "sensor_name":"collection_data_2"}
+      "sensor_name":"collection_data_2"
+    }
   ]
 }
 ```
@@ -70,7 +71,7 @@ While fluentd record must be a map (Hash), the output of EverySense becomes an a
 
 ### Output Plugin (Fluent::EverySenseOutput)
 
-Output Plugin can be used via match directive. Output Plugin assumes the input format as described above.
+Output Plugin can send events to EverySense server. It can be used via match directive. Output Plugin assumes the input format as described above.
 
 ```
 <match tag_name>
@@ -103,6 +104,63 @@ Output Plugin can be used via match directive. Output Plugin assumes the input f
   - **output_name**: sensor_name of the output sensor data.
   - **type_of_value**: type of value (default: Integer)
 
+## Filter Plugin (Fluent::EverySenseFilter)
+
+Filter Plugin can split an EverySense Server event into multiple fluentd events if it has multiple data. It can be used via filter directive.
+
+```
+<filter tag_name>
+  @type everysense
+</filter>
+```
+
+The following input data from EverySense Server will be splitted into multiple fluentd events.
+
+```
+{"json":
+  [
+    { "farm_uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx",
+      "sensor_name":"collection_data_1",
+      "data_class_name":"Illuminance",
+      "data": {
+        "at":"2016-08-24 00:15:00 UTC",
+        "value":137.0,
+        "unit":"lx"
+      }
+    },
+    { "farm_uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx",
+      "sensor_name":"collection_data_2",
+      "data_class_name":"Location",
+      "data": {
+        "at":"2016-08-24 00:15:00 UTC",
+        "values":[138.442062,35.8162422,671.599975],
+        "unit":"degree"
+      }
+    }
+  ]
+}
+```
+
+```
+{ "farm_uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx",
+  "sensor_name":"collection_data_1",
+  "data_class_name":"Illuminance",
+  "data": {
+    "at":"2016-08-24 00:15:00 UTC",
+    "value":137.0,
+    "unit":"lx"
+  }
+},
+{ "farm_uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx",
+  "sensor_name":"collection_data_2",
+  "data_class_name":"Location",
+  "data": {
+    "at":"2016-08-24 00:15:00 UTC",
+    "values":[138.442062,35.8162422,671.599975],
+    "unit":"degree"
+  }
+}
+```
 
 ## Contributing
 
