@@ -1,0 +1,123 @@
+{
+  "everystamp": {
+    "properties": {
+      "farm_uuid": {
+        "type": "string"
+      },
+      "sensor_name": {
+        "type": "string"
+      },
+      "data_class_name": {
+        "type": "string"
+      },
+      "timestamp": {
+        "type": "date",
+        "format": "yyyy-MM-dd HH:mm:ss"
+      },
+      "data": {
+        "type": "nested",
+        "properties": {
+          "at": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "values": {
+            "type": "string"
+          },
+          "location": {
+            "type": "nested",
+            "properties": {
+              "latitude": {
+                "type": "double"
+              },
+              "longitude": {
+                "type": "double"
+              },
+              "elevation": {
+                "type": "double"
+              },
+              "datum": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "accelerometer": {
+        "type": "nested",
+        "properties": {
+          "x": {
+            "type": "double"
+          },
+          "y": {
+            "type": "double"
+          },
+          "z": {
+            "type": "double"
+          }
+        }
+      },
+      "air_hygrometer": {
+        "type": "double"
+      },
+      "air_temperature": {
+        "type": "double"
+      },
+      "angular_velocity": {
+        "type": "nested",
+        "properties": {
+          "x": {
+            "type": "double"
+          },
+          "y": {
+            "type": "double"
+          },
+          "z": {
+            "type": "double"
+          }
+        }
+      },
+      "barometric_pressure": {
+        "type": "double"
+      },
+      "environmental_sound": {
+        "type": "double"
+      },
+      "earth_magnetometer": {
+        "type": "nested",
+        "properties": {
+          "x": {
+            "type": "double"
+          },
+          "y": {
+            "type": "double"
+          },
+          "z": {
+            "type": "double"
+          }
+        }
+      },
+      "illuminance": {
+        "type": "double"
+      },
+      "location": {
+        "type": "geo_point",
+        "lat_lon": true
+      },
+      "motion_activity": {
+        "type": "string"
+      },
+      "switch": {
+        "type": "boolean"
+      },
+      "uv_figure": {
+        "type": "double"
+      }
+    }
+  }
+}
