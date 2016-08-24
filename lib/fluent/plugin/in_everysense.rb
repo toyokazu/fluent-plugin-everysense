@@ -66,7 +66,7 @@ module Fluent
     end
 
     desc 'Tag name assigned to inputs'
-    config_param :tag, :string, :default => nil # TODO: mandatory option
+    config_param :tag, :string, :default => 'everysense'
     desc 'Polling interval to get message from EverySense API'
     config_param :polling_interval, :integer, :default => 60
     desc 'Device ID'
@@ -91,7 +91,7 @@ module Fluent
     end
 
     def start
-      raise StandardError.new if @tag.nil?
+      #raise StandardError.new if @tag.nil?
       super
       start_proxy
       @proxy_thread = Thread.new do

@@ -7,15 +7,18 @@ module Fluent
 
     def filter_stream(tag, es)
       new_es = MultiEventStream.new
-      es.each {|time, record| split(time, record, new_es)}
+      es.each do |time, record|
+        # puts "filter_everysense: #{record}"
+        split(time, record, new_es)
+      end
       new_es
     end
 
     private
 
     def split(time, record, new_es)
-      if record['json'].instance_of?(Array)
-        record['json'].each { |r| new_es.add(time, r) }
+      if record[:json].instance_of?(Array)
+        record[:json].each { |r| new_es.add(time, r) }
       else
         new_es.add(time, record)
       end
