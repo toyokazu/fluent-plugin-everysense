@@ -78,3 +78,10 @@ fluent-everystamp.conf ファイルを用いてfluentdを立ち上げます．
 ```
 fluentd -c fluent-everystamp.conf
 ```
+
+これでEverySense ServerにアップロードされたデータをElasticSearchに格納できるようになりました．
+
+fluentdをデーモンとして起動する方法については以下のページなどを参照してください．
+
+"fluentdをsystemdで管理する" (matetsuだもんで)
+http://matetsu.hatenablog.com/entry/2015/12/08/015444
