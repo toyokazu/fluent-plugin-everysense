@@ -11,13 +11,15 @@ https://www.elastic.co/downloads/elasticsearch
 
 Linuxの場合は以下のページにある方法でパッケージ管理システム (apt, yum) を用いてインストールするのが簡単です．
 
-https://www.elastic.co/guide/en/elasticsearch/reference/current/setup-service.html
+https://www.elastic.co/guide/en/elasticsearch/reference/current/setup-repositories.html
 
 Kibanaも同様にパッケージ管理システムを用いてインストールできます．
 
 https://www.elastic.co/guide/en/kibana/4.5/_upgrading_kibana.html
 
 インストールが完了したらサービスを開始します．
+
+https://www.elastic.co/guide/en/elasticsearch/reference/current/setup-service.html
 
 ```
 sudo /bin/systemctl daemon-reload
