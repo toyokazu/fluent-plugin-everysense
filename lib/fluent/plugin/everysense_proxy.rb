@@ -1,4 +1,4 @@
-module Fluent
+module Fluent::Plugin
   module EverySenseProxy
     require 'uri'
     require 'net/http'
@@ -15,11 +15,14 @@ module Fluent
       base.config_param :login_name, :string
       base.desc 'password for EverySense API'
       base.config_param :password, :string
+      base.desc 'Maximum number of entries returned'
       base.config_param :limit, :integer, :default => 1000
       #base.config_param :keep_alive, :integer, :default => 2
+      base.desc 'Start time of the entries returned'
       base.config_param :from, :string, :default => Time.now.iso8601
       base.config_param :keep, :bool, :default => false
       base.config_param :inline, :bool, :default => false
+      base.config_param :format, :string, :default => "json"
     end
 
     def start_proxy
@@ -96,7 +99,7 @@ module Fluent
       elsif !@recipe_id.nil?
         return "/recipe_data/#{@recipe_id}.#{@format}"
       else
-        raise ConfigError, "device_id or recipe_id must be specified."
+        raise Fluent::ConfigError, "device_id or recipe_id must be specified."
       end
     end
 
@@ -119,7 +122,7 @@ module Fluent
     def get_messages_request
       get_messages_req = @uri + target_path
       get_messages_req.query = URI.encode_www_form(get_messages_params)
-      $log.debug "#{@uri + target_path}?#{URI.encode_www_form(get_messages_params)}"
+      $log.debug "#{get_messages_req}?#{get_messages_req.query}"
       # currently time window is automatically updated
       @from = Time.now.iso8601
       get_messages_req

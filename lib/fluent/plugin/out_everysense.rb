@@ -1,12 +1,18 @@
-module Fluent
+require 'fluent/plugin/output'
+require 'fluent/event'
+require 'fluent/time'
+require 'fluent/plugin/everysense_proxy'
+
+module Fluent::Plugin
   # EverySenseOutput
   # output data to EverySense server
   # this module assumes the input format follows everysense output specification
-  class EverySenseOutput < BufferedOutput
-    require 'fluent/plugin/everysense_proxy'
+  class EverySenseOutput < Output
     include EverySenseProxy
 
-    Plugin.register_output('everysense', self)
+    Fluent::Plugin.register_output('everysense', self)
+
+    helpers :compat_parameters, :formatter, :inject
 
     # config_param defines a parameter. You can refer a parameter via @path instance variable
     # Without :default, a parameter is required.
@@ -14,9 +20,6 @@ module Fluent
     config_param :device_id, :string
     desc 'Flush interval to put message to EverySense API'
     config_param :flush_interval, :integer, :default => 30
-    # aggr_type: "none", "avg", "max", "min"
-    desc 'Aggregation type'
-    config_param :aggr_type, :string, :default => "none"
     # <sensor> is mandatory option
     # an example configuraton is shown below
     #
@@ -26,11 +29,11 @@ module Fluent
     #   type_of_value Integer
     # </sensor>
     # <sensor>
-    #   input_name collection_data_1
+    #   input_name collection_data_2
     #   output_name FESTIVAL_Test1_Sensor2
     #   type_of_value Integer
     # </sensor>
-    config_section :sensor, required: true, multi: true do
+    config_section :sensor, param_name: :sensors, required: true, multi: true do
       desc 'Input sensor name'
       config_param :input_name, :string, :default => nil
       desc 'Output sensor name'
@@ -48,24 +51,22 @@ module Fluent
     # If the configuration is invalid, raise Fluent::ConfigError.
     def configure(conf)
       super
-      configure_formatter(conf)
+      compat_parameters_convert(conf, :formatter, :inject, :buffer, default_chunk_key: "time")
+      formatter_config = conf.elements(name: 'format').first
+      @formatter = formatter_create(conf: formatter_config)
+      @has_buffer_section = conf.elements(name: 'buffer').size > 0
       #@sensor.each do |s|
       #  $log.debug s.to_h.inspect
       #end
-      @sensor_hash = {}
-      @sensor.each do |sensor|
-        if sensor.to_h[:input_name].nil?
-          @sensor_hash[sensor.to_h[:output_name]] = sensor.to_h
+      @out_sensors = {}
+      @sensors.each do |sensor|
+        if sensor.input_name.nil?
+          @out_sensors[sensor.output_name] = sensor
         else
-          @sensor_hash[sensor.to_h[:input_name]] = sensor.to_h
+          @out_sensors[sensor.input_name] = sensor
         end
       end
-      $log.debug @sensor_hash.inspect
-    end
-
-    def configure_formatter(conf)
-      #@formatter = Plugin.new_formatter(@format)
-      #@formatter.configure(conf)
+      $log.debug @out_sensors.inspect
     end
 
     # This method is called when starting.
@@ -75,13 +76,12 @@ module Fluent
       start_proxy
     end
 
-    def format(tag, time, record)
-      $log.debug "tag: #{tag}, time: #{time}, record: #{record}"
-      [tag, time, record].to_msgpack
+    def prefer_buffered_processing
+      @has_buffer_section
     end
 
-    def force_type(value)
-      case @type_of_value
+    def force_type(value, out_sensor)
+      case out_sensor.type_of_value
       when "Integer"
         return value.to_i
       when "Float"
@@ -113,85 +113,131 @@ module Fluent
     #     "sensor_name":"FESTIVAL_Test1_Sensor2"
     #   }
     # ]
-    def transform_sensor_data(sensor_data, output_name) # modify sensor_name
+    def transform_in_sensor(in_sensor, out_sensor) # modify sensor_name
       {
         data: {
-          at: Time.parse(sensor_data["data"]["at"]),
-          unit: sensor_data["data"]["unit"],
-          value: force_type(sensor_data["data"]["value"])
+          at: Time.parse(in_sensor["data"]["at"]),
+          unit: in_sensor["data"]["unit"],
+          value: force_type(in_sensor["data"]["value"], out_sensor)
         },
-        sensor_name: output_name
+        sensor_name: out_sensor.output_name
       }
     end
 
-    def get_output_name_by_name(input_name)
-      @sensor_hash[input_name][:output_name]
+    def get_out_sensor_by_name(input_name)
+      @out_sensors[input_name]
     end
 
-    def get_output_name_by_index(index)
-      @sensor_hash[@sensor_hash.keys[index]][:output_name]
+    def get_out_sensor_by_index(index)
+      @out_sensors[@out_sensors.keys[index]]
     end
 
-    def transform_device_data(device_data)
-      if device_data[0]["sensor_name"].nil?
+    # Assumed input message format is as follows
+    #
+    # [
+    #   [
+    #     {
+    #       "farm_uuid": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+    #       "sensor_name": "collection_data_1",
+    #       "data_class_name": "AirTemperature",
+    #       "data": {
+    #         "at": "2016-05-12 21:38:52 UTC",
+    #         "memo": null,
+    #         "value": 23,
+    #         "unit": "degree Celsius"
+    #       }
+    #     },
+    #     {
+    #       "farm_uuid": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+    #       "sensor_name": "collection_data_2",
+    #       "data_class_name": "AirHygrometer",
+    #       "data": {
+    #         "at": "2016-05-12 21:38:52 UTC",
+    #         "memo": null,
+    #         "value": 30,
+    #         "unit": "%RH"
+    #       }
+    #     }
+    #   ]
+    # ]
+    def transform_in_device(in_device)
+      if in_device[0]["sensor_name"].nil?
         # if first input data does not include sensor_name,
         # output_names are used in the specified order.
-        return device_data.map.with_index do |sensor_data, i|
-          if !get_output_name_by_index(i).nil?
-            transform_sensor_data(sensor_data, get_output_name_by_index(i))
+        return in_device.map.with_index do |in_sensor, i|
+          if !get_out_sensor_by_index(i).nil?
+            transform_in_sensor(in_sensor, get_out_sensor_by_index(i))
+          end
+        end.compact
+      else
+        return in_device.map do |in_sensor|
+          #$log.debug in_sensor["sensor_name"]
+          if @out_sensors.keys.include?(in_sensor["sensor_name"])
+            transform_in_sensor(in_sensor, get_out_sensor_by_name(in_sensor["sensor_name"]))
           end
         end.compact
       end
-      device_data.map do |sensor_data|
-        #$log.debug sensor_data["sensor_name"]
-        if @sensor_hash.keys.include?(sensor_data["sensor_name"])
-          transform_sensor_data(sensor_data, get_output_name_by_name(sensor_data["sensor_name"]))
+    end
+
+    # Emitted record inside fluentd network
+    # [
+    #   {"farm_uuid": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+    #    "device":
+    #     [
+    #       {
+    #         "farm_uuid": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+    #         "sensor_name": "collection_data_1",
+    #         "data_class_name": "AirTemperature",
+    #         "data": {
+    #           "at": "2016-05-12 21:38:52 UTC",
+    #           "memo": null,
+    #           "value": 23,
+    #           "unit": "degree Celsius"
+    #         }
+    #       },
+    #       {
+    #         "farm_uuid": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+    #         "sensor_name": "collection_data_2",
+    #         "data_class_name": "AirHygrometer",
+    #         "data": {
+    #           "at": "2016-05-12 21:38:52 UTC",
+    #           "memo": null,
+    #           "value": 30,
+    #           "unit": "%RH"
+    #         }
+    #       }
+    #     ]
+    #   }
+    # ]
+    def put_event_stream(tag, es)
+      if es.class == Fluent::OneEventStream
+        es = inject_values_to_event_stream(tag, es)
+        es.each do |time, record|
+          $log.debug "#{tag}, #{record}"
+          put_message(@formatter.format(tag, time, transform_in_device(record["device"])))
         end
-      end.compact
-    end
-
-    def avg(chunk)
-      device_data_list = []
-      chunk.msgpack_each do |tag, time, device_data|
-        device_data_list << transform_device_data(device_data)
-      end
-      avg_device_data = device_data_list[0]
-      device_data_list[1..-1].each do |device_data|
-        avg_device_data.each_with_index do |avg_sensor_data, i|
-          avg_sensor_data[:data][:at].to_i += device_data[i][:data][:at].to_i
-          avg_sensor_data[:data][:value] += device_data[i][:data][:value]
+      else
+        es = inject_values_to_event_stream(tag, es)
+        array = []
+        es.each do |time, record|
+          $log.debug "#{tag}, #{record}"
+          device = transform_in_device(record["device"])
+          array << device if !device.empty?
         end
+        put_message(@formatter.format(tag, Fluent::EventTime.now, array))
       end
-      avg_device_data.each_with_index do |avg_sensor_data, i|
-        # average time
-        avg_sensor_data[:data][:at] = Time.at((avg_sensor_data[:data][:at] / device_data_list.size).to_i)
-        # average value
-        avg_sensor_data[:data][:value] = force_type(avg_sensor_data[:data][:value] / device_data_list.size)
-      end
-      $log.debug avg_device_data.to_json
-      put_message(avg_device_data.to_json)
+      $log.flush
     end
 
-    def max(chunk)
-      # TODO
-    end
-
-    def min(chunk)
-      # TODO
+    def process(tag, es)
+      put_event_stream(tag, es)
     end
 
     def write(chunk)
-      case @aggr_type
-      when "none"
-        chunk.msgpack_each do |tag, time, record|
-          #$log.debug transform_device_data(record["json"]).to_json
-          put_message(transform_device_data(record["json"]).to_json)
-        end
-      when "avg", "max", "min"
-        method(@aggr_type).call(chunk)
-      else
-        raise NotImplementedError, "specified aggr_type is not implemented."
-      end
+      return if chunk.empty?
+      tag = chunk.metadata.tag
+
+      put_event_stream(tag, es)
     end
 
     # This method is called when shutting down.

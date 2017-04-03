@@ -1,14 +1,25 @@
-module Fluent
+require 'fluent/plugin/input'
+require 'fluent/event'
+require 'fluent/time'
+require 'fluent/plugin/everysense_proxy'
+
+module Fluent::Plugin
   class EverySenseInput < Input
-    require 'fluent/plugin/everysense_proxy'
     include EverySenseProxy
 
-    Plugin.register_input('everysense', self)
+    Fluent::Plugin.register_input('everysense', self)
 
-    config_param :format, :string, :default => 'json'
+    helpers :thread, :compat_parameters, :parser
 
-    # currently EverySenseParser is only used by EverySense Plugin
-    # Parser is implemented internally.
+    desc 'The tag of the event.'
+    config_param :tag, :string
+    desc 'Polling interval to get message from EverySense API'
+    config_param :polling_interval, :integer, :default => 60
+    desc 'Device ID'
+    config_param :device_id, :string, :default => nil
+    desc 'Recipe ID'
+    config_param :recipe_id, :string, :default => nil
+
     # received message format of EverySense is as follows
     #
     # [
@@ -37,47 +48,6 @@ module Fluent
     #     }
     #   ]
     # ]
-    class EverySenseParser
-      def initialize(format, parser)
-        case format
-        when 'json'
-          @parser = parser
-          return
-        when 'xml'
-          raise NotImplementedError, "XML parser is not implemented yet."
-        else
-          raise NotImplementedError, "XML parser is not implemented yet."
-        end
-      end
-
-      # TODO: parser should be impelented prettier way...
-      # currently once parse JSON array is parsed and in map loop
-      # each message is re-formatted to JSON. After that it is re-parsed
-      # by fluent JSON parser which supports time_format etc. options...
-      def parse(messages)
-        #$log.debug messages
-        JSON.parse(messages).map do |message|
-          #$log.debug message
-          @parser.parse(message.to_json) do |time, record|
-            yield(time, record)
-          end
-        end
-      end
-    end
-
-    desc 'Tag name assigned to inputs'
-    config_param :tag, :string, :default => 'everysense'
-    desc 'Polling interval to get message from EverySense API'
-    config_param :polling_interval, :integer, :default => 60
-    desc 'Device ID'
-    config_param :device_id, :string, :default => nil
-    desc 'Recipe ID'
-    config_param :recipe_id, :string, :default => nil
-
-    # Define `router` method of v0.12 to support v0.10 or earlier
-    unless method_defined?(:router)
-      define_method("router") { Fluent::Engine }
-    end
 
     def configure(conf)
       super
@@ -85,46 +55,97 @@ module Fluent
     end
 
     def configure_parser(conf)
-      @parser = Plugin.new_parser(@format)
-      @parser.configure(conf)
-      @everysense_parser = EverySenseParser.new(@format, @parser)
+      compat_parameters_convert(conf, :parser)
+      parser_config = conf.elements('parse').first
+      @parser = parser_create(conf: parser_config)
     end
 
     def start
       #raise StandardError.new if @tag.nil?
       super
       start_proxy
-      @proxy_thread = Thread.new do
-        while (true)
-          begin
-            messages = get_messages
-            emit(messages) if !(messages.nil? || messages.empty?)
-            sleep @polling_interval
-          rescue Exception => e
-            $log.error :error => e.to_s
-            $log.debug(e.backtrace.join("\n"))
-            #$log.debug_backtrace(e.backtrace)
-            sleep @polling_interval
-          end
+      @proxy_thread = Thread.new(&method(:get_loop))
+    end
+
+    def get_loop
+      while (true)
+        begin
+          messages = get_messages
+          emit(messages) if !(messages.nil? || messages.empty?)
+          sleep @polling_interval
+        rescue Exception => e
+          $log.error :error => e.to_s
+          $log.debug(e.backtrace.join("\n"))
+          #$log.debug_backtrace(e.backtrace)
+          sleep @polling_interval
         end
       end
     end
 
-    def parse(messages)
-      @everysense_parser.parse(messages) do |time, record|
-        if time.nil?
-          $log.debug "Since time_key field is nil, Fluent::Engine.now is used."
-          time = Fluent::Engine.now
-        end
-        #$log.debug "#{time}, #{record}"
-        {time: time, record: record}
+    def parse_time(record)
+      if record["data"]["at"].nil?
+        $log.debug "Since time_key field is nil, Fluent::EventTime.now is used."
+        Fluent::EventTime.now
+      else
+        @parser.parse_time(record["data"]["at"])
       end
     end
 
+    # Converted record for emission
+    # [
+    #   {"farm_uuid": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+    #    "device":
+    #     [
+    #       {
+    #         "farm_uuid": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+    #         "sensor_name": "collection_data_1",
+    #         "data_class_name": "AirTemperature",
+    #         "data": {
+    #           "at": "2016-05-12 21:38:52 UTC",
+    #           "memo": null,
+    #           "value": 23,
+    #           "unit": "degree Celsius"
+    #         }
+    #       },
+    #       {
+    #         "farm_uuid": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+    #         "sensor_name": "collection_data_2",
+    #         "data_class_name": "AirHygrometer",
+    #         "data": {
+    #           "at": "2016-05-12 21:38:52 UTC",
+    #           "memo": null,
+    #           "value": 30,
+    #           "unit": "%RH"
+    #         }
+    #       }
+    #     ]
+    #   }
+    # ]
     def emit(messages)
       begin
-        parse(messages).each do |msg|
-          router.emit(@tag, msg[:time], {json: msg[:record]})
+        time, record = @parser.parse(messages) do |time, record|
+          [time, record]
+        end
+        #puts "time: #{time.inspect}"
+        #puts "record: #{record.inspect}"
+        if record.is_a?(Array) && record[0].is_a?(Array) # Multiple devices case
+          mes = Fluent::MultiEventStream.new
+          record.each do |single_record|
+            # use timestamp of the first sensor (single_record[0])
+            mes.add(parse_time(single_record[0]), {
+              "farm_uuid": single_record[0]["farm_uuid"],
+              "device": single_record
+            })
+          end
+          router.emit_stream(@tag, mes)
+        elsif record.is_a?(Array) && record[0].is_a?(Hash) # Single device case
+          # use timestamp of the first sensor (single_record[0])
+          router.emit(@tag, parse_time(record[0]), {
+            "farm_uuid": record[0]["farm_uuid"],
+            "device": record
+          })
+        else # The other case
+          raise Fluent::Plugin::Parser::ParserError, "Unexpected input format."
         end
       rescue Exception => e
         $log.error :error => e.to_s

@@ -47,7 +47,8 @@ Input Plugin can receive events from EverySense Server. It can be used via sourc
 Since each device may have multiple sensors, time field is generated when Input Plugin received data from EverySense. It can be used only for inside the fluentd network because the real timestamps for the sensors are recorded inside JSON data and not synchronized to the time field. An example record format of the Input Plugin is as follows:
 
 ```
-{"json":
+{"farm_uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx",
+ "device":
   [
     { "data": {
         "at": "2016-05-15 12:14:30 +0900",
@@ -173,4 +174,4 @@ The following input data from EverySense Server will be splitted into multiple f
 
 ## License
 
-The gem is available as open source under the terms of the [MIT License](http://opensource.org/licenses/MIT).
+The gem is available as open source under the terms of the [Apache License Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
