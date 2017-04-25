@@ -50,14 +50,16 @@ Since each device may have multiple sensors, time field is generated when Input 
 {"farm_uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx",
  "device":
   [
-    { "data": {
+    { "farm_uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx",
+      "data": {
         "at": "2016-05-15 12:14:30 +0900",
         "unit":"degree Celsius",
         "value":23
       },
       "sensor_name":"collection_data_1"
     },
-    { "data": {
+    { "farm_uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx",
+      "data": {
         "at":"2016-05-15 12:14:30 +0900",
         "unit":"%RH",
         "value":30
@@ -68,7 +70,7 @@ Since each device may have multiple sensors, time field is generated when Input 
 }
 ```
 
-While fluentd record must be a map (Hash), the output of EverySense becomes an array. So, a key ("json") is added to make it as a map.
+While fluentd record must be a map (Hash), the output of a farm, a set of sensors in other words a virtual device, becomes an array of sensor data. So, the keys "farm_uuid" and "device" are added to make it as a map.
 
 ### Output Plugin (Fluent::EverySenseOutput)
 
