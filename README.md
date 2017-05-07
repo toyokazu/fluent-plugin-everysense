@@ -20,7 +20,7 @@ gem install fluent-plugin-everysense
 fluent-plugin-everysense has Input and Output Plugins for EverySense platform.
 
 
-### Input Plugin (Fluent::EverySenseInput)
+### Input Plugin (Fluent::Plugin::EverySenseInput)
 
 Input Plugin can receive events from EverySense Server. It can be used via source directive in the configuration.
 
@@ -44,19 +44,23 @@ Input Plugin can receive events from EverySense Server. It can be used via sourc
 - **recipe_id** (device_id or recipe_id is required): the target recipe id to obtain input data
 - **polling_interval**: interval to poll EverySense JSON over HTTP API
 
-Since each device may have multiple sensors, time field is generated when Input Plugin received data from EverySense. It can be used only for inside the fluentd network because the real timestamps for the sensors are recorded inside JSON data and not synchronized to the time field. An example record format of the Input Plugin is as follows:
+Time field is added for every sensor in EverySense because sometimes remotely deployed sensors are integrated into one device. So, time field of the whole device is generated when Input Plugin received data from EverySense. It can be used only for inside the fluentd network. The real timestamp for each sensors is recorded inside JSON data and not synchronized to the time field. An example record format of the Input Plugin is as follows:
 
 ```
-{"farm_uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx",
+# device with farm_uuid: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx
+{
+ "farm_uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx",
  "device":
   [
+    # list of sensors connected to this device
     { "farm_uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx",
       "data": {
         "at": "2016-05-15 12:14:30 +0900",
         "unit":"degree Celsius",
         "value":23
       },
-      "sensor_name":"collection_data_1"
+      "sensor_name":"collection_data_1",
+      "data_class_name":"AirTemperature"
     },
     { "farm_uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx",
       "data": {
@@ -64,15 +68,16 @@ Since each device may have multiple sensors, time field is generated when Input 
         "unit":"%RH",
         "value":30
       },
-      "sensor_name":"collection_data_2"
+      "sensor_name":"collection_data_2",
+      "data_class_name":"AirHygrometer"
     }
   ]
 }
 ```
 
-While fluentd record must be a map (Hash), the output of a farm, a set of sensors in other words a virtual device, becomes an array of sensor data. So, the keys "farm_uuid" and "device" are added to make it as a map.
+While fluentd record must be a map (Hash), the output of a farm, which means a set of sensors in other words a virtual device, becomes an array of sensor data. So, the keys "farm_uuid" and "device" are added to make it as a map.
 
-### Output Plugin (Fluent::EverySenseOutput)
+### Output Plugin (Fluent::Plugin::EverySenseOutput)
 
 Output Plugin can send events to EverySense server. It can be used via match directive. Output Plugin assumes the input format as described above.
 
@@ -101,15 +106,14 @@ Output Plugin can send events to EverySense server. It can be used via match dir
 - **password** (required): password for the login_name
 - **device_id** (required): The target device id to submit sensor data
 - **flush_interval**: Upload interval (default: 30)
-- **aggr_type**: Buffered sensor data can be aggregated with specified statistic method. Currently avg (average) and none (without aggregation) can be specified (default: none).
 - **sensor** (required): Output sensor names must be specified by sensor directive. Sensor data with the specified input_name will be uploaded to EverySense server with the output_name. If the input device data includes multiple sensor data, multiple directives can be specified. If sensor_name of input sensor data is not specified in the configuration, that sensor data will be skipped. If the sensor_names of input data are nil, sensor data will be uploaded with the number of sensor directives with the specified output_name.
   - **input_name**: sensor_name of the input sensor data.
   - **output_name**: sensor_name of the output sensor data.
   - **type_of_value**: type of value (default: Integer)
 
-## Filter Plugin (Fluent::EverySenseFilter)
+## Filter Plugin (Fluent::Plugin::EverySenseFilter)
 
-Filter Plugin can split an EverySense Server event into multiple fluentd events if it has multiple data. It can be used via filter directive.
+Filter Plugin can split an EverySense Server device data into multiple fluentd events if it has multiple sensor data. It can be used via filter directive.
 
 ```
 <filter tag_name>
@@ -117,53 +121,63 @@ Filter Plugin can split an EverySense Server event into multiple fluentd events 
 </filter>
 ```
 
-The following input data from EverySense Server will be splitted into multiple fluentd events.
+The following input data from EverySense Server will be split into multiple fluentd events.
+
+Target device data with multiple sensors in fluentd event form:
 
 ```
-{"json":
+{
+ "farm_uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx",
+ "device":
   [
     { "farm_uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx",
-      "sensor_name":"collection_data_1",
-      "data_class_name":"Illuminance",
       "data": {
-        "at":"2016-08-24 00:15:00 UTC",
-        "value":137.0,
-        "unit":"lx"
-      }
+        "at": "2016-05-15 12:14:30 +0900",
+        "unit":"degree Celsius",
+        "value":23
+      },
+      "sensor_name":"collection_data_1",
+      "data_class_name":"AirTemperature"
     },
     { "farm_uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx",
-      "sensor_name":"collection_data_2",
-      "data_class_name":"Location",
       "data": {
-        "at":"2016-08-24 00:15:00 UTC",
-        "values":[138.442062,35.8162422,671.599975],
-        "unit":"degree"
-      }
+        "at":"2016-05-15 12:14:30 +0900",
+        "unit":"%RH",
+        "value":30
+      },
+      "sensor_name":"collection_data_2",
+      "data_class_name":"AirHygrometer"
     }
   ]
 }
 ```
 
+will be split into the following fluentd events.
+
 ```
-{ "farm_uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx",
+{
+  "farm_uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx",
+  "data": {
+    "at": "2016-05-15 12:14:30 +0900",
+    "unit":"degree Celsius",
+    "value":23
+  },
   "sensor_name":"collection_data_1",
-  "data_class_name":"Illuminance",
+  "data_class_name":"AirTemperature"
+}
+{
+  "farm_uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx",
   "data": {
-    "at":"2016-08-24 00:15:00 UTC",
-    "value":137.0,
-    "unit":"lx"
-  }
-},
-{ "farm_uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx",
+    "at":"2016-05-15 12:14:30 +0900",
+    "unit":"%RH",
+    "value":30
+  },
   "sensor_name":"collection_data_2",
-  "data_class_name":"Location",
-  "data": {
-    "at":"2016-08-24 00:15:00 UTC",
-    "values":[138.442062,35.8162422,671.599975],
-    "unit":"degree"
-  }
+  "data_class_name":"AirHygrometer"
 }
 ```
+
+This filter can be used to store data into a time series database, e.g. Elasticsearch.
 
 ## Contributing
 

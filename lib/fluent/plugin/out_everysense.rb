@@ -16,10 +16,18 @@ module Fluent::Plugin
 
     # config_param defines a parameter. You can refer a parameter via @path instance variable
     # Without :default, a parameter is required.
+
+    desc 'EverySense API URI'
+    config_param :url, :string, default: 'https://api.every-sense.com:8001/'
+    desc 'login_name for EverySense API'
+    config_param :login_name, :string
+    desc 'password for EverySense API'
+    config_param :password, :string, secret: true
     desc 'Device ID'
     config_param :device_id, :string
     desc 'Flush interval to put message to EverySense API'
-    config_param :flush_interval, :integer, :default => 30
+    config_param :flush_interval, :integer, default: 30
+    config_param :format, :string, default: "json"
     # <sensor> is mandatory option
     # an example configuraton is shown below
     #
@@ -35,15 +43,15 @@ module Fluent::Plugin
     # </sensor>
     config_section :sensor, param_name: :sensors, required: true, multi: true do
       desc 'Input sensor name'
-      config_param :input_name, :string, :default => nil
+      config_param :input_name, :string, default: nil
       desc 'Output sensor name'
       config_param :output_name, :string
       # type_of_value: "Integer", "Float", "String", etc. The same as Ruby Class name.
       desc 'Type of value'
-      config_param :type_of_value, :string, :default => "Integer"
+      config_param :type_of_value, :string, default: "Integer"
       # unit: "degree Celsius", "%RH", ...
       #desc 'unit'
-      #config_param :unit, :string, :default => nil
+      #config_param :unit, :string, default: nil
     end
 
     # This method is called before starting.
@@ -55,9 +63,6 @@ module Fluent::Plugin
       formatter_config = conf.elements(name: 'format').first
       @formatter = formatter_create(conf: formatter_config)
       @has_buffer_section = conf.elements(name: 'buffer').size > 0
-      #@sensor.each do |s|
-      #  $log.debug s.to_h.inspect
-      #end
       @out_sensors = {}
       @sensors.each do |sensor|
         if sensor.input_name.nil?
@@ -66,7 +71,7 @@ module Fluent::Plugin
           @out_sensors[sensor.input_name] = sensor
         end
       end
-      $log.debug @out_sensors.inspect
+      log.debug @out_sensors.inspect
     end
 
     # This method is called when starting.
@@ -171,7 +176,7 @@ module Fluent::Plugin
         end.compact
       else
         return in_device.map do |in_sensor|
-          #$log.debug in_sensor["sensor_name"]
+          #log.debug in_sensor["sensor_name"]
           if @out_sensors.keys.include?(in_sensor["sensor_name"])
             transform_in_sensor(in_sensor, get_out_sensor_by_name(in_sensor["sensor_name"]))
           end
@@ -210,23 +215,11 @@ module Fluent::Plugin
     #   }
     # ]
     def put_event_stream(tag, es)
-      if es.class == Fluent::OneEventStream
-        es = inject_values_to_event_stream(tag, es)
-        es.each do |time, record|
-          $log.debug "#{tag}, #{record}"
-          put_message(@formatter.format(tag, time, transform_in_device(record["device"])))
-        end
-      else
-        es = inject_values_to_event_stream(tag, es)
-        array = []
-        es.each do |time, record|
-          $log.debug "#{tag}, #{record}"
-          device = transform_in_device(record["device"])
-          array << device if !device.empty?
-        end
-        put_message(@formatter.format(tag, Fluent::EventTime.now, array))
+      es = inject_values_to_event_stream(tag, es)
+      es.each do |time, record|
+        log.debug "#{tag}, #{record}"
+        put_message(@formatter.format(tag, time, transform_in_device(record["device"])))
       end
-      $log.flush
     end
 
     def process(tag, es)
