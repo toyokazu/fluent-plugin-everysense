@@ -58,8 +58,6 @@ rbenv global 2.2.4
 gem install fluent-plugin-everysense fluent-plugin-elasticsearch
 ```
 
-fluent-plugin-everysense は現状 fluentd のバージョン0.12.xに依存しているため，fluent-plugin-everysenseを先にインストールし，fluentd の 0.12.x をインストールします．0.14.x 系への対応は今後の課題です．
-
 
 ## ElasticSearchでのmappingの作成
 
@@ -67,7 +65,7 @@ piot-mapping.json ファイルを用いてmappingを作成します．
 
 ```
 curl -XPUT 'http://localhost:9200/piot'
-cat piot-mapping.json | curl -XPUT 'http://192.168.23.1:9200/piot/everystamp/_mapping' -d @-
+cat piot-mapping.json | curl -XPUT 'http://localhost:9200/piot/everystamp/_mapping' -d @-
 ```
 
 KibanaのSettingsのindex nameとしてpiotを指定し，時間属性としてtimestampを指定して，index patternを作成します．
