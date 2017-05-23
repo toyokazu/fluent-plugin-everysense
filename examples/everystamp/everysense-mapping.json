@@ -106,8 +106,7 @@
         "type": "double"
       },
       "location": {
-        "type": "geo_point",
-        "lat_lon": true
+        "type": "geo_point"
       },
       "motion_activity": {
         "type": "string"
