@@ -11,21 +11,21 @@ https://www.elastic.co/downloads/elasticsearch
 
 Linuxの場合は以下のページにある方法でパッケージ管理システム (apt, yum) を用いてインストールするのが簡単です．
 
-https://www.elastic.co/guide/en/elasticsearch/reference/current/setup-repositories.html
+https://www.elastic.co/guide/en/elasticsearch/reference/5.0/deb.html
+
 
 Kibanaも同様にパッケージ管理システムを用いてインストールできます．
 
-https://www.elastic.co/guide/en/kibana/4.5/_upgrading_kibana.html
+https://www.elastic.co/guide/en/kibana/5.0/deb.html
 
 インストールが完了したらサービスを開始します．
-
-https://www.elastic.co/guide/en/elasticsearch/reference/current/setup-service.html
 
 ```
 sudo /bin/systemctl daemon-reload
 sudo /bin/systemctl enable elasticsearch.service
 sudo /bin/systemctl start elasticsearch.service
 sudo /bin/systemctl enable kibana.service
+sudo /bin/systemctl start kibana.service
 ```
 
 ブラウザで http://localhost:5601/ にアクセスするとKibanaの画面が表示されます．
@@ -48,8 +48,8 @@ source ~/.bashrc
 ### ruby-buildのインストール
 git clone https://github.com/rbenv/ruby-build.git /usr/local/rbenv/plugins/ruby-build
 ### rubyのインストール
-rbenv install 2.2.4
-rbenv global 2.2.4
+rbenv install 2.4.1
+rbenv global 2.4.1
 ```
 以下fluentdと必要なpluginのインストールです．
 
@@ -61,11 +61,11 @@ gem install fluent-plugin-everysense fluent-plugin-elasticsearch
 
 ## ElasticSearchでのmappingの作成
 
-piot-mapping.json ファイルを用いてmappingを作成します．
+everysense-mapping.json ファイルを用いてmappingを作成します．
 
 ```
-curl -XPUT 'http://localhost:9200/piot'
-cat piot-mapping.json | curl -XPUT 'http://localhost:9200/piot/everystamp/_mapping' -d @-
+curl -XPUT 'http://localhost:9200/everysense'
+curl -XPUT 'http://localhost:9200/everysense/everystamp/_mapping' -d @everysense-mapping.json
 ```
 
 KibanaのSettingsのindex nameとしてpiotを指定し，時間属性としてtimestampを指定して，index patternを作成します．
@@ -73,10 +73,10 @@ KibanaのSettingsのindex nameとしてpiotを指定し，時間属性としてt
 
 ## fluentdの設定
 
-fluent-everystamp.conf ファイルを用いてfluentdを立ち上げます．
+everysense.conf ファイルを用いてfluentdを立ち上げます．
 
 ```
-fluentd -c fluent-everystamp.conf
+fluentd -c everysense.conf -vvv
 ```
 
 これでEverySense ServerにアップロードされたデータをElasticSearchに格納できるようになりました．

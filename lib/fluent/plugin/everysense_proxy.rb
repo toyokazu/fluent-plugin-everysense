@@ -35,7 +35,13 @@ module Fluent::Plugin
     end
 
     def valid_session?
-      !@session_key.nil? # TODO validate @session_key using EverySense API
+      # TODO validate @session_key using EverySense API
+      if !@session_key.nil?
+        if Time.now < @session_expires_in
+          return true
+        end
+      end
+      return false
     end
 
     def create_session_request
@@ -51,6 +57,7 @@ module Fluent::Plugin
       session_res = @https.request(@session_req)
       return nil if !error_handler(session_res, 'create_session failed.')
       @session_key = JSON.parse(session_res.body)["session_key"]
+      @session_expires_in = Time.now + 60 * 60 * 12 # assuming time out in a half day
     end
 
     def delete_session_request
