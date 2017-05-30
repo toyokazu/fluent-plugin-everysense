@@ -2,13 +2,13 @@
   "everystamp": {
     "properties": {
       "farm_uuid": {
-        "type": "string"
+        "type": "keyword"
       },
       "sensor_name": {
-        "type": "string"
+        "type": "keyword"
       },
       "data_class_name": {
-        "type": "string"
+        "type": "keyword"
       },
       "timestamp": {
         "type": "date",

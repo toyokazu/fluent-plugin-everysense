@@ -68,7 +68,7 @@ curl -XPUT 'http://localhost:9200/everysense'
 curl -XPUT 'http://localhost:9200/everysense/everystamp/_mapping' -d @everysense-mapping.json
 ```
 
-KibanaのSettingsのindex nameとしてpiotを指定し，時間属性としてtimestampを指定して，index patternを作成します．
+KibanaのSettingsのindex nameとしてpiotを指定し，時間属性としてtimestampを指定して，index patternを作成します．farm_uuidなどはグラフ化の際にsub-bucketsとして指定することがあるため，keyword型で登録しています．
 
 
 ## fluentdの設定
